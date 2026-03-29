@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero slim">
+    <h1>{{ tr('analytics_title') }}</h1>
+    <p>{{ tr('analytics_intro') }}</p>
+</section>
+
+<section class="chart-grid">
+    <article class="chart-card">
+        <h3>{{ tr('analytics_chart_day') }}</h3>
+        <canvas id="dayChart"></canvas>
+    </article>
+    <article class="chart-card">
+        <h3>{{ tr('analytics_chart_status') }}</h3>
+        <canvas id="statusChart"></canvas>
+    </article>
+    <article class="chart-card wide">
+        <h3>{{ tr('analytics_chart_conf') }}</h3>
+        <canvas id="confidenceChart"></canvas>
+    </article>
+</section>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-wrap">
+    <div class="auth-card panel-glow">
+        <h1>{{ tr('register_title') }}</h1>
+        <p>{{ tr('register_biometric_hint') }}</p>
+        {% if form_error_key %}
+            <div class="flash flash-danger">{{ tr(form_error_key) }}</div>
+        {% elif form_error_message %}
+            <div class="flash flash-danger">{{ form_error_message }}</div>
+        {% endif %}
+        <form method="post" action="{{ url_for('auth.register') }}" class="form-grid" enctype="multipart/form-data" id="registration-form"
+              data-camera-ready="{{ tr('demo_camera_ready') }}"
+              data-camera-denied="{{ tr('message_camera_denied') }}"
+              data-camera-unavailable="{{ tr('message_camera_unavailable') }}">
+            <label>{{ tr('form_username') }}
+                <input type="text" name="username" value="{{ form_values.username if form_values else '' }}" required>
+            </label>
+            <label>{{ tr('form_email') }}
+                <input type="email" name="email" value="{{ form_values.email if form_values else '' }}" required>
+            </label>
+            <label>{{ tr('form_password') }}
+                <input type="password" name="password" required>
+            </label>
+            <label>{{ tr('form_confirm_password') }}
+                <input type="password" name="confirm_password" required>
+            </label>
+            <label>{{ tr('form_language') }}
+                <select name="preferred_language">
+                    {% for code, name in available_languages.items() %}
+                        <option value="{{ code }}" {% if form_values and form_values.preferred_language == code %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="auth-biometric-block">
+                <div class="camera-actions">
+                    <button class="btn btn-secondary" type="button" id="register-open-camera-button">{{ tr('demo_open_camera') }}</button>
+                    <button class="btn btn-secondary" type="button" id="register-capture-button" hidden>{{ tr('register_capture_eye') }}</button>
+                    <button class="btn btn-secondary" type="button" id="register-close-camera-button" hidden>{{ tr('demo_close_camera') }}</button>
+                </div>
+                <p class="camera-helper">{{ tr('register_camera_helper') }}</p>
+                <input type="hidden" name="webcam_image_data" id="register-webcam-image-data">
+                <div class="camera-panel" id="register-camera-panel" hidden>
+                    <video id="register-camera-video" autoplay playsinline muted></video>
+                    <canvas id="register-camera-canvas" hidden></canvas>
+                    <div class="camera-status" id="register-camera-status">{{ tr('demo_camera_ready') }}</div>
+                </div>
+                <div class="image-preview" id="register-image-preview">
+                    <span>{{ tr('demo_preview_title') }}</span>
+                </div>
+                <label>{{ tr('form_biometric_image') }}
+                    <input type="file" name="biometric_image" id="register-biometric-image-input" accept=".png,.jpg,.jpeg,.bmp">
+                </label>
+            </div>
+            <button class="btn btn-primary" type="submit">{{ tr('form_submit_register') }}</button>
+        </form>
+    </div>
+</section>
+{% endblock %}

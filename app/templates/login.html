@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-wrap">
+    <div class="auth-options-grid">
+        <div class="auth-card panel-glow">
+            <h1>{{ tr('login_title') }}</h1>
+            <form method="post" action="{{ url_for('auth.login') }}" class="form-grid" id="password-login-form">
+                <label>{{ tr('form_username') }} / {{ tr('form_email') }}
+                    <input type="text" name="identifier" value="{{ login_values.identifier if login_values else '' }}" required>
+                </label>
+                <label>{{ tr('form_password') }}
+                    <input type="password" name="password" required>
+                </label>
+                <button class="btn btn-primary" type="submit">{{ tr('form_submit_login') }}</button>
+            </form>
+        </div>
+
+        <div class="auth-card panel-glow">
+            <div class="auth-biometric-block auth-biometric-only">
+                <h2>{{ tr('login_biometric_title') }}</h2>
+                <p class="camera-helper">{{ tr('login_biometric_helper') }}</p>
+                <div id="biometric-login-form" class="form-grid"
+                     data-endpoint="{{ url_for('auth.biometric_login') }}"
+                     data-camera-waiting="{{ tr('message_camera_waiting') }}"
+                     data-camera-ready="{{ tr('demo_camera_ready') }}"
+                     data-camera-denied="{{ tr('message_camera_denied') }}"
+                     data-camera-unavailable="{{ tr('message_camera_unavailable') }}"
+                     data-match-not-found="{{ tr('message_biometric_match_failed') }}"
+                     data-match-threshold-failed="{{ tr('message_biometric_match_failed_threshold') }}"
+                     data-processing-label="{{ tr('demo_processing') }}"
+                     data-waiting="{{ tr('message_biometric_waiting') }}"
+                     data-verifying="{{ tr('message_biometric_verifying') }}"
+                     data-finding-user="{{ tr('message_biometric_finding_user') }}"
+                     data-user-found="{{ tr('message_biometric_user_found') }}"
+                     data-user-not-found="{{ tr('message_biometric_user_not_found') }}"
+                     data-frame-received="{{ tr('message_frame_received') }}"
+                     data-face-detection="{{ tr('message_face_detection_started') }}"
+                     data-detecting-eye="{{ tr('message_detecting_eye') }}"
+                     data-selecting-eye="{{ tr('message_best_eye_selection_started') }}"
+                     data-extracting-features="{{ tr('message_extracting_features') }}"
+                     data-comparing-database="{{ tr('message_comparing_stored_template') }}"
+                     data-finalizing-login="{{ tr('message_finalizing_login') }}"
+                     data-scanning="{{ tr('message_biometric_scanning') }}"
+                     data-success="{{ tr('message_biometric_match_success_threshold') }}"
+                     data-required="{{ tr('message_biometric_verification_required') }}"
+                     data-enter-credentials="{{ tr('message_enter_credentials_first') }}"
+                     data-threshold-label="{{ tr('label_similarity_threshold') }}"
+                     data-camera-https-required="{{ tr('message_camera_https_required') }}"
+                     data-diag-pending="{{ tr('diag_pending') }}"
+                     data-diag-in-progress="{{ tr('diag_in_progress') }}"
+                     data-diag-completed="{{ tr('diag_completed') }}"
+                     data-diag-detected="{{ tr('diag_detected') }}"
+                     data-diag-not-detected="{{ tr('diag_not_detected') }}"
+                     data-diag-segmented="{{ tr('diag_segmented') }}"
+                     data-diag-found="{{ tr('diag_found') }}"
+                     data-diag-not-found="{{ tr('diag_not_found') }}"
+                     data-diag-started="{{ tr('diag_started') }}"
+                     data-diag-captured="{{ tr('diag_captured') }}"
+                     data-diag-failed="{{ tr('diag_failed') }}"
+                     data-diag-match-found="{{ tr('diag_match_found') }}"
+                     data-diag-no-match="{{ tr('diag_no_match') }}"
+                     data-diag-allowed="{{ tr('diag_allowed') }}"
+                     data-diag-denied="{{ tr('diag_denied') }}"
+                     data-diag-user-found="{{ tr('diag_user_found') }}"
+                     data-diag-user-not-found="{{ tr('diag_user_not_found') }}"
+                     data-diag-face-detected="{{ tr('diag_face_detected') }}"
+                     data-diag-best-eye-selected="{{ tr('diag_best_eye_selected') }}"
+                     data-diag-yes="{{ tr('diag_yes') }}"
+                     data-diag-no="{{ tr('diag_no') }}">
+                    <label>{{ tr('form_username') }} / {{ tr('form_email') }}
+                        <input type="text" id="login-identifier-input" value="{{ login_values.identifier if login_values else '' }}" required>
+                    </label>
+                    <div class="camera-actions">
+                        <button class="btn btn-secondary" type="button" id="login-open-camera-button">{{ tr('login_with_biometrics') }}</button>
+                        <button class="btn btn-secondary" type="button" id="login-capture-button" hidden>{{ tr('login_capture_eye') }}</button>
+                        <button class="btn btn-secondary" type="button" id="login-close-camera-button" hidden>{{ tr('demo_close_camera') }}</button>
+                    </div>
+                    <input type="hidden" id="login-webcam-image-data">
+                    <div class="faceid-shell scanner-idle" id="login-faceid-shell">
+                        <div class="faceid-stage-copy" id="login-stage-copy">{{ tr('message_camera_waiting') }}</div>
+                        <div class="camera-panel faceid-camera-panel" id="login-camera-panel" hidden>
+                            <div class="faceid-orb" id="login-faceid-orb">
+                                <div class="faceid-ring"></div>
+                                <div class="faceid-ring faceid-ring-secondary"></div>
+                                <div class="faceid-scanline" id="login-faceid-scanline"></div>
+                                <div class="faceid-status-icon" id="login-faceid-icon">◎</div>
+                                <video id="login-camera-video" autoplay playsinline muted></video>
+                            </div>
+                            <canvas id="login-camera-canvas" hidden></canvas>
+                            <div class="camera-status faceid-camera-status" id="login-camera-status">{{ tr('demo_camera_ready') }}</div>
+                        </div>
+                    </div>
+                    <div class="image-preview" id="login-image-preview">
+                        <span>{{ tr('demo_preview_title') }}</span>
+                    </div>
+                    <div class="auth-stage-grid" id="login-stage-grid">
+                        <div class="stage-chip" data-stage="frame_received">{{ tr('stage_frame_received') }}</div>
+                        <div class="stage-chip" data-stage="face_detection">{{ tr('stage_face_detection') }}</div>
+                        <div class="stage-chip" data-stage="eye_detection">{{ tr('pipeline_detection') }}</div>
+                        <div class="stage-chip" data-stage="eye_selection">{{ tr('stage_eye_selection') }}</div>
+                        <div class="stage-chip" data-stage="pupil_segmentation">{{ tr('pipeline_pupil_segmentation') }}</div>
+                        <div class="stage-chip" data-stage="iris_segmentation">{{ tr('pipeline_iris_segmentation') }}</div>
+                        <div class="stage-chip" data-stage="feature_extraction">{{ tr('pipeline_features') }}</div>
+                        <div class="stage-chip" data-stage="comparison">{{ tr('pipeline_matching') }}</div>
+                    </div>
+                    <div class="loading-overlay" id="login-loading-overlay" hidden>
+                        <div class="spinner-ring"></div>
+                        <p id="login-processing-step">{{ tr('message_comparing_stored_template') }}</p>
+                    </div>
+                    <div class="feature-list" id="login-diagnostic-panel">
+                        <h4>{{ tr('login_diagnostic_title') }}</h4>
+                        <div class="feature-item"><span>{{ tr('diag_user_lookup') }}</span><strong id="diag-user-found">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_camera_opened') }}</span><strong id="diag-camera-opened">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_frame_captured') }}</span><strong id="diag-frame-captured">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_face_detected') }}</span><strong id="diag-face-detected">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_eye_detected') }}</span><strong id="diag-eye-detected">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_best_eye_selected') }}</span><strong id="diag-best-eye-selected">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_pupil_detected') }}</span><strong id="diag-pupil-detected">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_iris_segmented') }}</span><strong id="diag-iris-segmented">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_feature_extracted') }}</span><strong id="diag-feature-extracted">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_template_found') }}</span><strong id="diag-template-found">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_comparison_started') }}</span><strong id="diag-comparison-started">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_similarity_score') }}</span><strong id="diag-similarity-score">-</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_final_decision') }}</span><strong id="diag-final-decision">{{ tr('diag_pending') }}</strong></div>
+                        <div class="feature-item"><span>{{ tr('diag_login_decision') }}</span><strong id="diag-login-decision">{{ tr('diag_pending') }}</strong></div>
+                    </div>
+                    <div class="validation-card{% if login_feedback and login_feedback.is_error %} result-error{% elif login_feedback and (login_feedback.message_key or login_feedback.message) %} result-success{% endif %}" id="login-biometric-result">
+                        <h4>{{ tr('result_authentication_title') }}</h4>
+                        <p class="validation-message" id="login-biometric-message">
+                            {% if login_feedback and login_feedback.message_key %}
+                                {{ tr(login_feedback.message_key) }}
+                            {% elif login_feedback and login_feedback.message %}
+                                {{ login_feedback.message }}
+                            {% else %}
+                                {{ tr('message_biometric_waiting') }}
+                            {% endif %}
+                        </p>
+                        <p class="validation-recommendation" id="login-biometric-detail">
+                            {% if login_feedback and login_feedback.detail_key %}
+                                {{ tr(login_feedback.detail_key) }}
+                            {% else %}
+                                {{ tr('message_biometric_verification_required') }}
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

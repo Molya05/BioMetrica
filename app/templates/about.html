@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero slim">
+    <h1>{{ tr('about_title') }}</h1>
+    <p>{{ tr('about_intro') }}</p>
+</section>
+
+<section class="feature-grid">
+    <article class="feature-card">
+        <h3>{{ tr('about_goal_title') }}</h3>
+        <p>{{ tr('about_goal_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('about_value_title') }}</h3>
+        <p>{{ tr('about_value_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('docs_architecture') }}</h3>
+        <p>{{ tr('docs_architecture_text') }}</p>
+    </article>
+</section>
+{% endblock %}

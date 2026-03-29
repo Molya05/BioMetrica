@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero slim">
+    <h1>{{ tr('methods_title') }}</h1>
+    <p>{{ tr('methods_intro') }}</p>
+</section>
+
+<section class="stack-grid">
+    <article class="feature-card">
+        <h3>{{ tr('methods_preprocessing_title') }}</h3>
+        <p>{{ tr('methods_preprocessing_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('methods_cv_title') }}</h3>
+        <p>{{ tr('methods_cv_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('methods_segmentation_title') }}</h3>
+        <p>{{ tr('methods_segmentation_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('methods_features_title') }}</h3>
+        <p>{{ tr('methods_features_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('methods_matching_title') }}</h3>
+        <p>{{ tr('methods_matching_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('methods_ml_title') }}</h3>
+        <p>{{ tr('methods_ml_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('methods_future_title') }}</h3>
+        <p>{{ tr('methods_future_text') }}</p>
+    </article>
+    <article class="info-panel">
+        <h3>{{ tr('label_pipeline') }}</h3>
+        <div class="pipeline-strip vertical">
+            <span>{{ tr('pipeline_upload') }}</span>
+            <span>{{ tr('pipeline_detection') }}</span>
+            <span>{{ tr('pipeline_pupil_segmentation') }}</span>
+            <span>{{ tr('pipeline_iris_segmentation') }}</span>
+            <span>{{ tr('pipeline_features') }}</span>
+            <span>{{ tr('pipeline_matching') }}</span>
+            <span>{{ tr('pipeline_result') }}</span>
+        </div>
+    </article>
+</section>
+{% endblock %}

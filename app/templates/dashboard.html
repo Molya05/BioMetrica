@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero slim dashboard-hero">
+    <h1>{{ tr('dashboard_title') }}</h1>
+    <p>{{ tr('dashboard_intro') }}</p>
+</section>
+
+<section class="stats-grid dashboard-stats-grid">
+    <article class="stat-card dashboard-stat-card">
+        <strong>{{ total }}</strong>
+        <span>{{ tr('dashboard_total') }}</span>
+    </article>
+    <article class="stat-card dashboard-stat-card">
+        <strong>{{ successes }}</strong>
+        <span>{{ tr('dashboard_success') }}</span>
+    </article>
+    <article class="stat-card dashboard-stat-card">
+        <strong>{{ avg_confidence }}%</strong>
+        <span>{{ tr('dashboard_avg_conf') }}</span>
+    </article>
+    <article class="stat-card dashboard-stat-card">
+        <strong>{{ latest.created_at.strftime('%H:%M') if latest else '--' }}</strong>
+        <span>{{ tr('dashboard_last') }}</span>
+    </article>
+</section>
+
+<section class="content-grid dashboard-content-grid">
+    <article class="info-panel dashboard-panel dashboard-results-panel">
+        <h3>{{ tr('label_recent_results') }}</h3>
+        {% if recent %}
+            <div class="table-wrap dashboard-table-wrap">
+                <table class="dashboard-results-table">
+                    <thead>
+                        <tr>
+                            <th>{{ tr('table_file') }}</th>
+                            <th>{{ tr('table_status') }}</th>
+                            <th>{{ tr('table_confidence') }}</th>
+                            <th>{{ tr('table_date') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in recent %}
+                            <tr class="dashboard-result-row">
+                                <td data-label="{{ tr('table_file') }}">{{ item.filename }}</td>
+                                <td data-label="{{ tr('table_status') }}">{{ enum_label('status', item.result_status) }}</td>
+                                <td data-label="{{ tr('table_confidence') }}">{{ item.confidence_score }}%</td>
+                                <td data-label="{{ tr('table_date') }}">{{ item.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p>{{ tr('empty_history') }}</p>
+        {% endif %}
+    </article>
+    <article class="info-panel dashboard-panel dashboard-pipeline-panel">
+        <h3>{{ tr('label_pipeline') }}</h3>
+        <div class="timeline-card dashboard-timeline-card">
+            <span>{{ tr('pipeline_upload') }}</span>
+            <span>{{ tr('pipeline_detection') }}</span>
+            <span>{{ tr('pipeline_segmentation') }}</span>
+            <span>{{ tr('pipeline_features') }}</span>
+            <span>{{ tr('pipeline_matching') }}</span>
+            <span>{{ tr('pipeline_result') }}</span>
+        </div>
+    </article>
+</section>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero-grid">
+    <div class="hero-copy panel-glow">
+        <span class="badge">{{ tr('hero_badge') }}</span>
+        <h1>{{ tr('hero_title') }}</h1>
+        <p>{{ tr('hero_text') }}</p>
+        <div class="hero-actions">
+            {% if current_user.is_authenticated %}
+                <a class="btn btn-primary" href="{{ url_for('dashboard.recognition') }}">{{ tr('hero_primary') }}</a>
+            {% else %}
+                <a class="btn btn-primary" href="{{ url_for('auth.register') }}">{{ tr('hero_primary') }}</a>
+            {% endif %}
+            <a class="btn btn-secondary" href="{{ url_for('main.methods') }}">{{ tr('hero_secondary') }}</a>
+        </div>
+        <div class="stats-grid">
+            <article class="stat-card">
+                <strong>92%</strong>
+                <span>{{ tr('stat_accuracy') }}</span>
+            </article>
+            <article class="stat-card">
+                <strong>3</strong>
+                <span>{{ tr('stat_languages') }}</span>
+            </article>
+            <article class="stat-card">
+                <strong>10+</strong>
+                <span>{{ tr('stat_modules') }}</span>
+            </article>
+        </div>
+    </div>
+    <div class="hero-visual panel-glow">
+        <div class="scanner-frame">
+            <div class="scanner-orbit"></div>
+            <div class="scanner-core"></div>
+            <div class="scanner-scanline"></div>
+        </div>
+        <div class="hero-side-card">
+            <h3>{{ tr('hero_card_title') }}</h3>
+            <p>{{ tr('hero_card_text') }}</p>
+            <div class="pipeline-mini">
+                <span>{{ tr('pipeline_upload') }}</span>
+                <span>{{ tr('pipeline_detection') }}</span>
+                <span>{{ tr('pipeline_segmentation') }}</span>
+                <span>{{ tr('pipeline_features') }}</span>
+                <span>{{ tr('pipeline_matching') }}</span>
+                <span>{{ tr('pipeline_result') }}</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="content-grid">
+    <article class="info-panel">
+        <h2>{{ tr('section_overview') }}</h2>
+        <p>{{ tr('section_overview_text') }}</p>
+    </article>
+    <article class="info-panel">
+        <h2>{{ tr('section_pipeline') }}</h2>
+        <div class="pipeline-strip">
+            <span>{{ tr('pipeline_upload') }}</span>
+            <span>{{ tr('pipeline_detection') }}</span>
+            <span>{{ tr('pipeline_segmentation') }}</span>
+            <span>{{ tr('pipeline_features') }}</span>
+            <span>{{ tr('pipeline_matching') }}</span>
+            <span>{{ tr('pipeline_result') }}</span>
+        </div>
+    </article>
+</section>
+
+<section class="feature-grid">
+    <article class="feature-card">
+        <h3>{{ tr('feature_auth_title') }}</h3>
+        <p>{{ tr('feature_auth_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('feature_cv_title') }}</h3>
+        <p>{{ tr('feature_cv_text') }}</p>
+    </article>
+    <article class="feature-card">
+        <h3>{{ tr('feature_analytics_title') }}</h3>
+        <p>{{ tr('feature_analytics_text') }}</p>
+    </article>
+</section>
+{% endblock %}

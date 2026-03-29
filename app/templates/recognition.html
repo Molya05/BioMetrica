@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero slim">
+    <h1>{{ tr('demo_title') }}</h1>
+    <p>{{ tr('demo_intro') }}</p>
+</section>
+
+<section class="recognition-grid">
+    <article class="upload-card panel-glow">
+        <h2>{{ tr('demo_upload_title') }}</h2>
+        <p>{{ tr('demo_upload_hint') }}</p>
+        <form method="post" enctype="multipart/form-data" class="form-grid" id="analysis-form"
+              data-processing-label="{{ tr('demo_processing') }}"
+              data-validation-message="{{ tr('message_upload_missing') }}"
+              data-camera-ready="{{ tr('demo_camera_ready') }}"
+              data-camera-denied="{{ tr('message_camera_denied') }}"
+              data-camera-unavailable="{{ tr('message_camera_unavailable') }}">
+            <div class="recognition-form-shell">
+                <div class="capture-options">
+                    <label class="file-drop">
+                        <span>{{ tr('demo_select_image') }}</span>
+                        <input type="file" name="eye_image" id="eye-image-input" accept=".png,.jpg,.jpeg,.bmp">
+                    </label>
+                    <div class="camera-actions">
+                        <button class="btn btn-secondary" type="button" id="open-camera-button">{{ tr('demo_open_camera') }}</button>
+                        <button class="btn btn-secondary" type="button" id="capture-button" hidden>{{ tr('demo_capture') }}</button>
+                        <button class="btn btn-secondary" type="button" id="close-camera-button" hidden>{{ tr('demo_close_camera') }}</button>
+                    </div>
+                </div>
+                <input type="hidden" name="webcam_image_data" id="webcam-image-data">
+                <div class="recognition-preview-stack">
+                    <div class="camera-panel" id="camera-panel" hidden>
+                        <video id="camera-video" autoplay playsinline muted></video>
+                        <canvas id="camera-canvas" hidden></canvas>
+                        <div class="camera-status" id="camera-status">{{ tr('demo_camera_ready') }}</div>
+                    </div>
+                    <div class="image-preview" id="image-preview">
+                        <span>{{ tr('demo_preview_title') }}</span>
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-primary" type="submit" id="analyze-button">{{ tr('demo_analyze') }}</button>
+        </form>
+        <div class="loading-overlay" id="loading-overlay" hidden>
+            <div class="spinner-ring"></div>
+            <p>{{ tr('label_pipeline') }}...</p>
+        </div>
+    </article>
+
+    <article class="results-card panel-glow">
+        <h2>{{ tr('demo_results_title') }}</h2>
+        <div class="pipeline-strip interactive">
+            <span>{{ tr('pipeline_upload') }}</span>
+            <span>{{ tr('pipeline_detection') }}</span>
+            <span>{{ tr('pipeline_pupil_segmentation') }}</span>
+            <span>{{ tr('pipeline_iris_segmentation') }}</span>
+            <span>{{ tr('pipeline_features') }}</span>
+            <span>{{ tr('pipeline_matching') }}</span>
+            <span>{{ tr('pipeline_result') }}</span>
+        </div>
+
+        {% if analysis_result %}
+            {% set stage_images = analysis_result.stage_images if analysis_result.stage_images else {} %}
+            {% set original_image_url = media_url(analysis_result.image_path or stage_images.get('original')) %}
+            {% set eye_detection_url = media_url(stage_images.get('eye_detection')) %}
+            {% set pupil_segmentation_url = media_url(stage_images.get('pupil_segmentation')) %}
+            {% set iris_segmentation_url = media_url(stage_images.get('iris_segmentation')) %}
+            {% set feature_extraction_url = media_url(stage_images.get('feature_extraction')) %}
+            {% set matching_url = media_url(stage_images.get('matching')) %}
+            {% set final_result_url = media_url(analysis_result.annotated_path or stage_images.get('final')) %}
+            <div class="result-layout">
+                <div class="result-main">
+                    <div class="result-stage-grid">
+                        {% for stage_key, stage_status in analysis_result.stages.items() %}
+                            <div class="result-stage-card stage-{{ stage_status }}">
+                                <span>{{ tr('stage_' ~ stage_key) }}</span>
+                                <strong class="{{ 'authenticated' if stage_status == 'completed' else 'failed' if stage_status == 'failed' else '' }}">{{ enum_label('stage_status', stage_status) }}</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="result-images">
+                        <div class="result-image-card">
+                            <h4>{{ tr('label_original') }}</h4>
+                            {% if original_image_url %}
+                                <img src="{{ original_image_url }}" alt="{{ tr('alt_original_image') }}">
+                            {% else %}
+                                <div class="empty-state">{{ tr('result_image_missing_text') }}</div>
+                            {% endif %}
+                        </div>
+                        {% if eye_detection_url %}
+                            <div class="result-image-card">
+                                <h4>{{ tr('pipeline_detection') }}</h4>
+                                <img src="{{ eye_detection_url }}" alt="{{ tr('alt_eye_detection_result') }}">
+                            </div>
+                        {% endif %}
+                        {% if pupil_segmentation_url %}
+                            <div class="result-image-card">
+                                <h4>{{ tr('pipeline_pupil_segmentation') }}</h4>
+                                <img src="{{ pupil_segmentation_url }}" alt="{{ tr('alt_pupil_segmentation_result') }}">
+                            </div>
+                        {% endif %}
+                        {% if iris_segmentation_url %}
+                            <div class="result-image-card">
+                                <h4>{{ tr('pipeline_iris_segmentation') }}</h4>
+                                <img src="{{ iris_segmentation_url }}" alt="{{ tr('alt_iris_segmentation_result') }}">
+                            </div>
+                        {% endif %}
+                        {% if feature_extraction_url %}
+                            <div class="result-image-card">
+                                <h4>{{ tr('pipeline_features') }}</h4>
+                                <img src="{{ feature_extraction_url }}" alt="{{ tr('alt_feature_extraction_result') }}">
+                            </div>
+                        {% endif %}
+                        {% if matching_url %}
+                            <div class="result-image-card result-image-card-accent">
+                                <h4>{{ tr('pipeline_matching') }}</h4>
+                                <img src="{{ matching_url }}" alt="{{ tr('alt_matching_stage_result') }}">
+                            </div>
+                        {% endif %}
+                        <div class="result-image-card result-image-card-accent">
+                            <h4>{{ tr('pipeline_result') }}</h4>
+                            {% if final_result_url %}
+                                <img src="{{ final_result_url }}" alt="{{ tr('alt_processed_eye_image') }}">
+                            {% else %}
+                                <div class="empty-state">{{ tr('result_final_image_missing_text') }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="result-metrics result-sidebar">
+                    {% if analysis_result.is_valid_image %}
+                        <div class="validation-card">
+                            <h4>{{ tr('result_authentication_title') }}</h4>
+                            <div class="metric-row">
+                                <span>{{ tr('result_decision') }}</span>
+                                <strong class="{{ analysis_result.status }}">{{ tr('result_match') if analysis_result.decision == 'matched' else tr('result_not_match') }}</strong>
+                            </div>
+                            <div class="metric-row">
+                                <span>{{ tr('result_similarity') }}</span>
+                                <strong>{{ analysis_result.similarity_score }}%</strong>
+                            </div>
+                            <div class="confidence-bar">
+                                <div style="width: {{ analysis_result.similarity_score }}%"></div>
+                            </div>
+                            <div class="metric-row">
+                                <span>{{ tr('result_matched_user') }}</span>
+                                <strong>{{ analysis_result.matched_user or tr('result_no_match') }}</strong>
+                            </div>
+                        </div>
+                        <div class="metric-row">
+                            <span>{{ tr('result_quality_score') }}</span>
+                            <strong>{{ analysis_result.confidence_score }}%</strong>
+                        </div>
+                        <div class="metric-row">
+                            <span>{{ tr('result_status') }}</span>
+                            <strong class="{{ analysis_result.status }}">{{ tr('result_success') if analysis_result.status == 'authenticated' else tr('result_rejected') }}</strong>
+                        </div>
+                        <div class="metric-row">
+                            <span>{{ tr('result_time') }}</span>
+                            <strong>{{ analysis_result.processing_time }} s</strong>
+                        </div>
+                        <div class="feature-list">
+                            <h4>{{ tr('result_features') }}</h4>
+                            {% for key, value in analysis_result.features.items() %}
+                                <div class="feature-item">
+                                    <span>{{ enum_label('feature', key) }}</span>
+                                    <strong>{{ value }}</strong>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        {% if analysis_result.component_scores %}
+                            <div class="feature-list">
+                                <h4>{{ tr('result_component_scores') }}</h4>
+                                {% for key, value in analysis_result.component_scores.items() %}
+                                    <div class="feature-item">
+                                        <span>{{ enum_label('component', key) }}</span>
+                                        <strong>{{ value }}%</strong>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="validation-card">
+                            <h4>{{ tr('validation_title') }}</h4>
+                            <p class="validation-message">{{ analysis_result.error_message }}</p>
+                            <p class="validation-recommendation">{{ analysis_result.recommendation_message }}</p>
+                            <div class="metric-row">
+                                <span>{{ tr('result_time') }}</span>
+                                <strong>{{ analysis_result.processing_time }} s</strong>
+                            </div>
+                        </div>
+                    {% endif %}
+                </aside>
+            </div>
+            <div class="methods-grid">
+                <article class="feature-card">
+                    <h3>{{ tr('methods_preprocessing_title') }}</h3>
+                    <p>{{ tr('methods_preprocessing_text') }}</p>
+                </article>
+                <article class="feature-card">
+                    <h3>{{ tr('methods_segmentation_title') }}</h3>
+                    <p>{{ tr('methods_segmentation_text') }}</p>
+                </article>
+                <article class="feature-card">
+                    <h3>{{ tr('methods_matching_title') }}</h3>
+                    <p>{{ tr('methods_matching_text') }}</p>
+                </article>
+            </div>
+        {% else %}
+            <div class="empty-state">{{ tr('demo_empty') }}</div>
+        {% endif %}
+        <p class="demo-note">{{ tr('label_demo_note') }}</p>
+    </article>
+</section>
+{% endblock %}

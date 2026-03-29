@@ -1,0 +1,19 @@
+{
+  "name": "BioMetrica Vision",
+  "short_name": "BioMetrica",
+  "description": "Biometric authentication and pupil recognition web app.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "icons": [
+    {
+      "src": "/static/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero slim">
+    <h1>{{ tr('profile_title') }}</h1>
+    <p>{{ tr('profile_intro') }}</p>
+</section>
+
+<section class="content-grid single">
+    <article class="info-panel">
+        <form method="post" class="form-grid">
+            <label>{{ tr('form_username') }}
+                <input type="text" name="username" value="{{ current_user.username }}" required>
+            </label>
+            <label>{{ tr('form_email') }}
+                <input type="email" name="email" value="{{ current_user.email }}" required>
+            </label>
+            <label>{{ tr('form_language') }}
+                <select name="preferred_language">
+                    {% for code, name in available_languages.items() %}
+                        <option value="{{ code }}" {% if current_user.preferred_language == code %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>{{ tr('form_password') }}
+                <input type="password" name="password" placeholder="{{ tr('form_password_placeholder') }}">
+            </label>
+            <div class="profile-meta">
+                <span><strong>{{ tr('label_role') }}:</strong> {{ enum_label('role', current_user.role) }}</span>
+                <span><strong>{{ tr('label_created') }}:</strong> {{ current_user.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            </div>
+            <button class="btn btn-primary" type="submit">{{ tr('form_update_profile') }}</button>
+        </form>
+    </article>
+</section>
+{% endblock %}

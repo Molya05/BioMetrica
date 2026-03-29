@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero slim">
+    <h1>{{ tr('admin_title') }}</h1>
+    <p>{{ tr('admin_intro') }}</p>
+</section>
+
+<section class="content-grid">
+    <article class="info-panel">
+        <h3>{{ tr('label_users') }}</h3>
+        {% if users %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>{{ tr('form_username') }}</th>
+                            <th>{{ tr('form_email') }}</th>
+                            <th>{{ tr('label_role') }}</th>
+                            <th>{{ tr('table_date') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                            <tr>
+                                <td>{{ user.username }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>{{ enum_label('role', user.role) }}</td>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p>{{ tr('empty_users') }}</p>
+        {% endif %}
+    </article>
+
+    <article class="info-panel">
+        <h3>{{ tr('label_recent_results') }}</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>{{ tr('table_user') }}</th>
+                        <th>{{ tr('table_file') }}</th>
+                        <th>{{ tr('table_status') }}</th>
+                        <th>{{ tr('table_confidence') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in analyses %}
+                        <tr>
+                            <td>{{ item.user.username }}</td>
+                            <td>{{ item.filename }}</td>
+                            <td>{{ enum_label('status', item.result_status) }}</td>
+                            <td>{{ item.confidence_score }}%</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    <article class="info-panel wide">
+        <h3>{{ tr('label_system_logs') }}</h3>
+        {% if logs %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>{{ tr('table_action') }}</th>
+                            <th>{{ tr('table_user') }}</th>
+                            <th>{{ tr('table_description') }}</th>
+                            <th>{{ tr('table_date') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                            <tr>
+                                <td>{{ enum_label('log_action', log.action) }}</td>
+                                <td>{{ log.user.username if log.user else tr('system_user') }}</td>
+                                <td>{{ log.description }}</td>
+                                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p>{{ tr('empty_logs') }}</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}

@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: biometrica-vision
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    disk:
+      name: biometrica-storage
+      mountPath: /opt/render/project/src/instance/storage
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SESSION_COOKIE_SECURE
+        value: "1"
+      - key: REMEMBER_COOKIE_SECURE
+        value: "1"
+      - key: PREFERRED_URL_SCHEME
+        value: https
+      - key: STORAGE_ROOT
+        value: /opt/render/project/src/instance/storage
+      - key: UPLOAD_FOLDER
+        value: /opt/render/project/src/instance/storage/uploads
+      - key: PROCESSED_FOLDER
+        value: /opt/render/project/src/instance/storage/uploads/processed

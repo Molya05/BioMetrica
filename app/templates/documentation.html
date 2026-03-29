@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero slim system-model-hero">
+    <h1>{{ tr('docs_title') }}</h1>
+    <p>{{ tr('docs_intro') }}</p>
+</section>
+
+<section class="docs-grid system-model-grid">
+    <article class="info-panel system-model-card">
+        <h3>{{ tr('docs_architecture') }}</h3>
+        <p>{{ tr('docs_architecture_text') }}</p>
+    </article>
+    <article class="info-panel system-model-card">
+        <h3>{{ tr('docs_stack') }}</h3>
+        <p>{{ tr('docs_stack_text') }}</p>
+    </article>
+    <article class="info-panel system-model-card">
+        <h3>{{ tr('docs_flow') }}</h3>
+        <p>{{ tr('docs_flow_text') }}</p>
+    </article>
+    <article class="code-panel info-panel system-model-card system-model-card-wide">
+        <h3>{{ tr('docs_components_title') }}</h3>
+        <div class="feature-list system-model-feature-list">
+            <div class="feature-item system-model-feature-item"><span>{{ tr('docs_component_app_factory') }}</span></div>
+            <div class="feature-item system-model-feature-item"><span>{{ tr('docs_component_blueprints') }}</span></div>
+            <div class="feature-item system-model-feature-item"><span>{{ tr('docs_component_models') }}</span></div>
+            <div class="feature-item system-model-feature-item"><span>{{ tr('docs_component_sessions') }}</span></div>
+            <div class="feature-item system-model-feature-item"><span>{{ tr('docs_component_recognition_service') }}</span></div>
+            <div class="feature-item system-model-feature-item"><span>{{ tr('docs_component_multilingual_templates') }}</span></div>
+            <div class="feature-item system-model-feature-item"><span>{{ tr('docs_component_chart_analytics') }}</span></div>
+            <div class="feature-item system-model-feature-item"><span>{{ tr('docs_component_sqlite_persistence') }}</span></div>
+        </div>
+    </article>
+</section>
+{% endblock %}
