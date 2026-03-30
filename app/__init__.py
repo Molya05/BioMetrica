@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from flask import Flask, g, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from flask_login import current_user
 from sqlalchemy import inspect, text
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -102,6 +102,35 @@ def create_app():
     def uploaded_media(filename):
         normalized = str(filename).replace("\\", "/").lstrip("/")
         return send_from_directory(app.config["STORAGE_ROOT"], normalized)
+
+    @app.errorhandler(400)
+    def bad_request(error):
+        if request.path.endswith("/login/biometric"):
+            return jsonify(
+                {
+                    "success": False,
+                    "biometric_verified": False,
+                    "error_code": "bad_request",
+                    "error_message": translate(getattr(g, "lang", app.config["DEFAULT_LANGUAGE"]), "message_registration_failed"),
+                    "current_step": "login_failed",
+                }
+            ), 400
+        return render_template("500.html"), 400
+
+    @app.errorhandler(413)
+    def file_too_large(error):
+        message = translate(getattr(g, "lang", app.config["DEFAULT_LANGUAGE"]), "message_upload_invalid")
+        if request.path.endswith("/login/biometric"):
+            return jsonify(
+                {
+                    "success": False,
+                    "biometric_verified": False,
+                    "error_code": "file_too_large",
+                    "error_message": message,
+                    "current_step": "capturing_image",
+                }
+            ), 413
+        return render_template("500.html"), 413
 
     @app.errorhandler(404)
     def not_found(error):

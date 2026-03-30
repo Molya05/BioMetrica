@@ -9,6 +9,8 @@ import numpy as np
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..extensions import db
 from ..models import Analysis
@@ -47,6 +49,21 @@ def _decode_request_frame(image_bytes):
     return frame
 
 
+def _safe_commit(action, *, filename=None):
+    try:
+        db.session.commit()
+        return True
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception(
+            "%s database failure user_id=%s filename=%s",
+            action,
+            current_user.id,
+            filename,
+        )
+        return False
+
+
 @dashboard_bp.route("/recognition", methods=["GET", "POST"])
 @login_required
 def recognition():
@@ -55,45 +72,68 @@ def recognition():
         image = request.files.get("eye_image")
         webcam_image_data = (request.form.get("webcam_image_data") or "").strip()
         captured_frame = None
+        saved_path = None
+        original_filename = None
 
-        if webcam_image_data:
-            try:
-                _, encoded = webcam_image_data.split(",", 1)
-                image_bytes = base64.b64decode(encoded)
-            except (ValueError, binascii.Error):
-                flash("message_upload_invalid", "danger")
-                return render_template("recognition.html", analysis_result=analysis_result)
+        current_app.logger.info(
+            "recognition POST received user_id=%s content_length=%s has_file=%s has_camera_data=%s",
+            current_user.id,
+            request.content_length,
+            bool(image and image.filename),
+            bool(webcam_image_data),
+        )
 
-            captured_frame = _decode_request_frame(image_bytes)
-            if captured_frame is None:
-                flash("message_upload_invalid", "danger")
-                return render_template("recognition.html", analysis_result=analysis_result)
+        try:
+            if webcam_image_data:
+                try:
+                    _, encoded = webcam_image_data.split(",", 1)
+                    image_bytes = base64.b64decode(encoded)
+                except (ValueError, binascii.Error):
+                    flash("message_upload_invalid", "danger")
+                    return render_template("recognition.html", analysis_result=analysis_result)
 
-            filename = unique_filename("webcam_capture.png")
-            saved_path = current_app.config["UPLOAD_FOLDER"] / filename
-            saved_path.write_bytes(image_bytes)
-            original_filename = "webcam_capture.png"
-        else:
-            if not image or not image.filename:
-                flash("message_upload_missing", "danger")
-                return render_template("recognition.html", analysis_result=analysis_result)
-            if not allowed_file(image.filename):
-                flash("message_upload_invalid", "danger")
-                return render_template("recognition.html", analysis_result=analysis_result)
+                captured_frame = _decode_request_frame(image_bytes)
+                if captured_frame is None:
+                    flash("message_upload_invalid", "danger")
+                    return render_template("recognition.html", analysis_result=analysis_result)
 
-            image_bytes = image.read()
-            captured_frame = _decode_request_frame(image_bytes)
-            if captured_frame is None:
-                flash("message_upload_invalid", "danger")
-                return render_template("recognition.html", analysis_result=analysis_result)
+                filename = unique_filename("webcam_capture.png")
+                saved_path = current_app.config["UPLOAD_FOLDER"] / filename
+                saved_path.write_bytes(image_bytes)
+                original_filename = "webcam_capture.png"
+            else:
+                if not image or not image.filename:
+                    flash("message_upload_missing", "danger")
+                    return render_template("recognition.html", analysis_result=analysis_result)
+                if not allowed_file(image.filename):
+                    flash("message_upload_invalid", "danger")
+                    return render_template("recognition.html", analysis_result=analysis_result)
 
-            filename = unique_filename(image.filename)
-            saved_path = current_app.config["UPLOAD_FOLDER"] / filename
-            saved_path.write_bytes(image_bytes)
-            original_filename = image.filename
+                image_bytes = image.read()
+                captured_frame = _decode_request_frame(image_bytes)
+                if captured_frame is None:
+                    flash("message_upload_invalid", "danger")
+                    return render_template("recognition.html", analysis_result=analysis_result)
+
+                filename = unique_filename(image.filename)
+                saved_path = current_app.config["UPLOAD_FOLDER"] / filename
+                saved_path.write_bytes(image_bytes)
+                original_filename = image.filename
+        except RequestEntityTooLarge:
+            flash("message_upload_invalid", "danger")
+            return render_template("recognition.html", analysis_result=analysis_result)
+        except Exception:
+            current_app.logger.exception("recognition input processing crashed user_id=%s", current_user.id)
+            flash("message_registration_failed", "danger")
+            return render_template("recognition.html", analysis_result=analysis_result)
 
         analysis_start = time.perf_counter()
-        result = analyze_image(captured_frame, current_app.config["PROCESSED_FOLDER"])
+        try:
+            result = analyze_image(captured_frame, current_app.config["PROCESSED_FOLDER"])
+        except Exception:
+            current_app.logger.exception("recognition analysis crashed user_id=%s", current_user.id)
+            flash("message_registration_failed", "danger")
+            return render_template("recognition.html", analysis_result=analysis_result)
         current_app.logger.info(
             "recognition analysis user_id=%s success=%s timings=%s elapsed=%.4fs",
             current_user.id,
@@ -173,7 +213,9 @@ def recognition():
                 f"Authentication completed for {original_filename} with similarity {verification_result['similarity_score']}%.",
                 current_user.id,
             )
-            db.session.commit()
+            if not _safe_commit("recognition_success", filename=original_filename):
+                flash("message_registration_failed", "danger")
+                return render_template("recognition.html", analysis_result=analysis_result)
             analysis_result = {
                 **result,
                 **verification_result,
@@ -213,7 +255,9 @@ def recognition():
             )
             db.session.add(record)
             log_event("authentication_failed", f"Authentication failed for {original_filename}: {error_code}.", current_user.id)
-            db.session.commit()
+            if not _safe_commit("recognition_failure", filename=original_filename):
+                flash("message_registration_failed", "danger")
+                return render_template("recognition.html", analysis_result=analysis_result)
             analysis_result = {
                 **result,
                 "image_path": to_public_path(saved_path),

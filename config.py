@@ -33,6 +33,21 @@ def _database_uri():
     return database_url
 
 
+def _engine_options():
+    database_uri = _database_uri()
+    options = {
+        "pool_pre_ping": True,
+    }
+    if database_uri.startswith("sqlite:"):
+        options["connect_args"] = {
+            "check_same_thread": False,
+            "timeout": 30,
+        }
+    else:
+        options["pool_recycle"] = 1800
+    return options
+
+
 def _path_from_env(name, default_path):
     raw_value = os.environ.get(name)
     if not raw_value:
@@ -45,6 +60,7 @@ class Config:
     DEBUG = _env_flag("FLASK_DEBUG", default=False)
     SQLALCHEMY_DATABASE_URI = _database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = _engine_options()
     STORAGE_ROOT = _path_from_env("STORAGE_ROOT", DEFAULT_STORAGE_ROOT)
     UPLOAD_FOLDER = _path_from_env("UPLOAD_FOLDER", STORAGE_ROOT / "uploads")
     PROCESSED_FOLDER = _path_from_env("PROCESSED_FOLDER", UPLOAD_FOLDER / "processed")

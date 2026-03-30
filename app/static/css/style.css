@@ -395,7 +395,7 @@ p {
     width: 78%;
     height: 78%;
     border: 2px dashed rgba(53, 217, 255, 0.55);
-    animation: spin 12s linear infinite;
+    animation: orbit-spin 12s linear infinite;
 }
 
 .scanner-scanline {
@@ -1325,6 +1325,11 @@ th {
 }
 
 @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes orbit-spin {
     from { transform: translate(-50%, -50%) rotate(0deg); }
     to { transform: translate(-50%, -50%) rotate(360deg); }
 }

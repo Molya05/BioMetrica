@@ -1,5 +1,6 @@
 from pathlib import Path
 import time
+import uuid
 
 import cv2
 import numpy as np
@@ -110,7 +111,8 @@ def _stage_output_path(processed_dir, source_name, suffix):
 def _save_stage_image(image, processed_dir, source_name, suffix):
     processed_dir = _ensure_processed_dir(processed_dir)
     stage_path = _stage_output_path(processed_dir, source_name, suffix)
-    cv2.imwrite(str(stage_path), image)
+    if not cv2.imwrite(str(stage_path), image):
+        raise RuntimeError(f"failed_to_write_stage_image:{suffix}")
     return str(stage_path)
 
 
@@ -377,7 +379,7 @@ def _load_frame(image_input):
 def analyze_image(image_input, processed_dir, require_both_eyes=False):
     total_start = time.perf_counter()
     processed_dir = _ensure_processed_dir(processed_dir)
-    source_name = image_input if not isinstance(image_input, np.ndarray) else "captured_frame"
+    source_name = image_input if not isinstance(image_input, np.ndarray) else f"captured_frame_{uuid.uuid4().hex[:12]}"
     stage_images = {}
     stage_statuses = _stage_status_template()
     timings = _timing_template()

@@ -10,6 +10,7 @@ from flask import Blueprint, current_app, flash, jsonify, redirect, render_templ
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..extensions import db
 from ..models import BiometricProfile, User
@@ -126,6 +127,22 @@ def _save_biometric_input(upload_file, webcam_image_data, fallback_name):
     saved_path = current_app.config["UPLOAD_FOLDER"] / filename
     saved_path.write_bytes(image_bytes)
     return saved_path, upload_file.filename, frame, None
+
+
+def _safe_commit(action, *, username=None, email=None, user_id=None):
+    try:
+        db.session.commit()
+        return True
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception(
+            "%s database failure username=%s email=%s user_id=%s",
+            action,
+            username,
+            email,
+            user_id,
+        )
+        return False
 
 
 def _resolve_biometric_feedback(lang, error_code):
@@ -266,6 +283,12 @@ def login():
         identifier = request.form.get("identifier", "").strip()
         password = request.form.get("password", "")
         form_data = {"identifier": identifier}
+        current_app.logger.info(
+            "password login attempt identifier=%s remote=%s user_agent=%s",
+            identifier,
+            request.headers.get("X-Forwarded-For", request.remote_addr),
+            request.user_agent.string,
+        )
         user = User.query.filter(or_(User.username == identifier, User.email == identifier)).first()
         if not user or not user.check_password(password):
             session.pop("pending_biometric_user_id", None)
@@ -286,7 +309,10 @@ def login():
         session.pop("pending_biometric_verified_at", None)
         session.pop("pending_biometric_similarity", None)
         log_event("login", f"User {user.username} signed in.", user.id)
-        db.session.commit()
+        if not _safe_commit("login", username=user.username, email=user.email, user_id=user.id):
+            flash("message_login_success", "success")
+            next_page = request.args.get("next")
+            return redirect(next_page or url_for("dashboard.dashboard"))
         flash("message_login_success", "success")
         next_page = request.args.get("next")
         return redirect(next_page or url_for("dashboard.dashboard"))
@@ -360,7 +386,37 @@ def biometric_login():
             extra={"current_step": "user_lookup_failed"},
         )
 
-    saved_path, _, captured_frame, input_error = _save_biometric_input(upload_file, webcam_image_data, "biometric_login_capture.png")
+    try:
+        saved_path, _, captured_frame, input_error = _save_biometric_input(upload_file, webcam_image_data, "biometric_login_capture.png")
+    except RequestEntityTooLarge:
+        return _biometric_login_response(
+            preferred_language=preferred_language,
+            http_status=413,
+            success=False,
+            biometric_verified=False,
+            user_found=True,
+            match_passed=False,
+            error_code="file_too_large",
+            error_message=translate(preferred_language, "message_upload_invalid"),
+            recommendation_message=translate(preferred_language, "validation_recapture"),
+            result={"is_valid_image": False},
+            extra={"current_step": "capturing_image"},
+        )
+    except Exception:
+        current_app.logger.exception("biometric_login input processing crashed identifier=%s", identifier)
+        return _biometric_login_response(
+            preferred_language=preferred_language,
+            http_status=500,
+            success=False,
+            biometric_verified=False,
+            user_found=True,
+            match_passed=False,
+            error_code="backend_processing_failed",
+            error_message=translate(preferred_language, "message_registration_failed"),
+            recommendation_message=translate(preferred_language, "validation_recapture"),
+            result={"is_valid_image": False},
+            extra={"current_step": "login_failed"},
+        )
     if input_error:
         return _biometric_login_response(
             preferred_language=preferred_language,
@@ -387,7 +443,24 @@ def biometric_login():
         )
 
     analysis_start = time.perf_counter()
-    result = analyze_image(captured_frame, current_app.config["PROCESSED_FOLDER"], require_both_eyes=True)
+    try:
+        result = analyze_image(captured_frame, current_app.config["PROCESSED_FOLDER"], require_both_eyes=True)
+    except Exception:
+        current_app.logger.exception("biometric_login analysis crashed identifier=%s", identifier)
+        return _biometric_login_response(
+            preferred_language=preferred_language,
+            http_status=500,
+            success=False,
+            biometric_verified=False,
+            user_found=True,
+            match_passed=False,
+            error_code="backend_processing_failed",
+            error_message=translate(preferred_language, "message_registration_failed"),
+            recommendation_message=translate(preferred_language, "validation_recapture"),
+            result={"is_valid_image": False},
+            saved_path=saved_path,
+            extra={"current_step": "login_failed"},
+        )
     current_app.logger.info(
         "biometric_login analysis identifier=%s success=%s timings=%s elapsed=%.4fs",
         identifier,
@@ -493,7 +566,21 @@ def biometric_login():
         f"User {user.username} signed in with biometric verification at similarity {match_result['similarity_score']}%.",
         user.id,
     )
-    db.session.commit()
+    if not _safe_commit("biometric_login", username=user.username, email=user.email, user_id=user.id):
+        return _biometric_login_response(
+            preferred_language=preferred_language,
+            http_status=500,
+            success=False,
+            biometric_verified=False,
+            user_found=True,
+            match_passed=False,
+            error_code="database_write_failed",
+            error_message=translate(preferred_language, "message_registration_failed"),
+            recommendation_message=translate(preferred_language, "validation_recapture"),
+            result=result,
+            saved_path=saved_path,
+            extra={"current_step": "login_failed"},
+        )
     return _biometric_login_response(
         preferred_language=preferred_language,
         http_status=200,
@@ -573,11 +660,23 @@ def register():
             flash("message_user_exists", "danger")
             return render_template("register.html", **_registration_context(form_data, "message_user_exists"))
 
-        biometric_path, original_name, captured_frame, input_error = _save_biometric_input(
-            biometric_image,
-            webcam_image_data,
-            "registration_capture.png",
-        )
+        try:
+            biometric_path, original_name, captured_frame, input_error = _save_biometric_input(
+                biometric_image,
+                webcam_image_data,
+                "registration_capture.png",
+            )
+        except RequestEntityTooLarge:
+            flash("message_upload_invalid", "danger")
+            return render_template("register.html", **_registration_context(form_data, "message_upload_invalid"))
+        except Exception:
+            current_app.logger.exception(
+                "register biometric input crashed username=%s email=%s",
+                username,
+                email,
+            )
+            flash("message_registration_failed", "danger")
+            return render_template("register.html", **_registration_context(form_data, "message_registration_failed"))
         if input_error:
             current_app.logger.warning(
                 "register biometric input rejected username=%s email=%s error=%s",
@@ -644,22 +743,15 @@ def register():
             )
             db.session.add(profile)
             log_event("register", f"New user {username} registered.", user.id)
-            db.session.commit()
+            if not _safe_commit("register", username=username, email=email, user_id=user.id):
+                flash("message_registration_failed", "danger")
+                return render_template("register.html", **_registration_context(form_data, "message_registration_failed"))
             current_app.logger.info(
                 "register success username=%s user_id=%s processed_path=%s",
                 username,
                 user.id,
                 enrollment_result.get("processed_path"),
             )
-        except SQLAlchemyError:
-            db.session.rollback()
-            current_app.logger.exception(
-                "register database failure username=%s email=%s",
-                username,
-                email,
-            )
-            flash("message_registration_failed", "danger")
-            return render_template("register.html", **_registration_context(form_data, "message_registration_failed"))
         except Exception:
             db.session.rollback()
             current_app.logger.exception(
@@ -680,7 +772,7 @@ def register():
 @login_required
 def logout():
     log_event("logout", f"User {current_user.username} signed out.", current_user.id)
-    db.session.commit()
+    _safe_commit("logout", username=current_user.username, email=current_user.email, user_id=current_user.id)
     logout_user()
     flash("message_logout", "info")
     return redirect(url_for("main.home"))
