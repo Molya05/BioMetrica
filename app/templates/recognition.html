@@ -83,7 +83,8 @@
                         <div class="result-image-card">
                             <h4>{{ tr('label_original') }}</h4>
                             {% if original_image_url %}
-                                <img src="{{ original_image_url }}" alt="{{ tr('alt_original_image') }}">
+                                <img src="{{ original_image_url }}" alt="{{ tr('alt_original_image') }}" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div class="empty-state" hidden>{{ tr('result_image_missing_text') }}</div>
                             {% else %}
                                 <div class="empty-state">{{ tr('result_image_missing_text') }}</div>
                             {% endif %}
@@ -91,37 +92,43 @@
                         {% if eye_detection_url %}
                             <div class="result-image-card">
                                 <h4>{{ tr('pipeline_detection') }}</h4>
-                                <img src="{{ eye_detection_url }}" alt="{{ tr('alt_eye_detection_result') }}">
+                                <img src="{{ eye_detection_url }}" alt="{{ tr('alt_eye_detection_result') }}" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div class="empty-state" hidden>{{ tr('result_image_missing_text') }}</div>
                             </div>
                         {% endif %}
                         {% if pupil_segmentation_url %}
                             <div class="result-image-card">
                                 <h4>{{ tr('pipeline_pupil_segmentation') }}</h4>
-                                <img src="{{ pupil_segmentation_url }}" alt="{{ tr('alt_pupil_segmentation_result') }}">
+                                <img src="{{ pupil_segmentation_url }}" alt="{{ tr('alt_pupil_segmentation_result') }}" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div class="empty-state" hidden>{{ tr('result_image_missing_text') }}</div>
                             </div>
                         {% endif %}
                         {% if iris_segmentation_url %}
                             <div class="result-image-card">
                                 <h4>{{ tr('pipeline_iris_segmentation') }}</h4>
-                                <img src="{{ iris_segmentation_url }}" alt="{{ tr('alt_iris_segmentation_result') }}">
+                                <img src="{{ iris_segmentation_url }}" alt="{{ tr('alt_iris_segmentation_result') }}" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div class="empty-state" hidden>{{ tr('result_image_missing_text') }}</div>
                             </div>
                         {% endif %}
                         {% if feature_extraction_url %}
                             <div class="result-image-card">
                                 <h4>{{ tr('pipeline_features') }}</h4>
-                                <img src="{{ feature_extraction_url }}" alt="{{ tr('alt_feature_extraction_result') }}">
+                                <img src="{{ feature_extraction_url }}" alt="{{ tr('alt_feature_extraction_result') }}" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div class="empty-state" hidden>{{ tr('result_image_missing_text') }}</div>
                             </div>
                         {% endif %}
                         {% if matching_url %}
                             <div class="result-image-card result-image-card-accent">
                                 <h4>{{ tr('pipeline_matching') }}</h4>
-                                <img src="{{ matching_url }}" alt="{{ tr('alt_matching_stage_result') }}">
+                                <img src="{{ matching_url }}" alt="{{ tr('alt_matching_stage_result') }}" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div class="empty-state" hidden>{{ tr('result_image_missing_text') }}</div>
                             </div>
                         {% endif %}
                         <div class="result-image-card result-image-card-accent">
                             <h4>{{ tr('pipeline_result') }}</h4>
                             {% if final_result_url %}
-                                <img src="{{ final_result_url }}" alt="{{ tr('alt_processed_eye_image') }}">
+                                <img src="{{ final_result_url }}" alt="{{ tr('alt_processed_eye_image') }}" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">
+                                <div class="empty-state" hidden>{{ tr('result_final_image_missing_text') }}</div>
                             {% else %}
                                 <div class="empty-state">{{ tr('result_final_image_missing_text') }}</div>
                             {% endif %}

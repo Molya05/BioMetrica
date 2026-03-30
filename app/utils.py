@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 import os
+from pathlib import Path
 import secrets
 
 from flask import current_app
@@ -22,10 +23,36 @@ def unique_filename(filename):
 
 
 def to_public_path(path_value):
-    normalized = str(path_value).replace("\\", "/")
-    base = str(current_app.root_path).replace("\\", "/")
-    project_root = os.path.dirname(base)
-    return normalized.replace(project_root, "").lstrip("/")
+    if not path_value:
+        return None
+
+    candidate = Path(str(path_value)).expanduser()
+    storage_root = Path(current_app.config["STORAGE_ROOT"]).resolve()
+    upload_root = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
+    processed_root = Path(current_app.config["PROCESSED_FOLDER"]).resolve()
+
+    try:
+        return candidate.resolve().relative_to(storage_root).as_posix()
+    except ValueError:
+        pass
+
+    try:
+        relative_to_upload = candidate.resolve().relative_to(upload_root)
+        return Path("uploads", relative_to_upload).as_posix()
+    except ValueError:
+        pass
+
+    try:
+        relative_to_processed = candidate.resolve().relative_to(processed_root)
+        return Path("uploads", "processed", relative_to_processed).as_posix()
+    except ValueError:
+        pass
+
+    normalized = str(path_value).replace("\\", "/").lstrip("/")
+    for marker in ("instance/storage/", "uploads/", "processed/"):
+        if normalized.startswith(marker):
+            return normalized
+    return normalized
 
 
 def log_event(action, description, user_id=None):

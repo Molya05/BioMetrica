@@ -51,8 +51,22 @@ def create_app():
             if not path_value:
                 return None
             normalized = str(path_value).replace("\\", "/").lstrip("/")
-            if normalized.startswith("uploads/"):
-                normalized = normalized[len("uploads/") :]
+            storage_root = Path(app.config["STORAGE_ROOT"]).resolve().as_posix().rstrip("/")
+            upload_root = Path(app.config["UPLOAD_FOLDER"]).resolve().as_posix().rstrip("/")
+            processed_root = Path(app.config["PROCESSED_FOLDER"]).resolve().as_posix().rstrip("/")
+
+            if normalized.startswith(storage_root + "/"):
+                normalized = normalized[len(storage_root) + 1 :]
+            elif normalized.startswith(upload_root + "/"):
+                normalized = f"uploads/{normalized[len(upload_root) + 1 :]}"
+            elif normalized.startswith(processed_root + "/"):
+                normalized = f"uploads/processed/{normalized[len(processed_root) + 1 :]}"
+            elif normalized.startswith("instance/storage/"):
+                normalized = normalized[len("instance/storage/") :]
+
+            if normalized.startswith("static/"):
+                return url_for("static", filename=normalized[len("static/") :])
+
             return url_for("uploaded_media", filename=normalized)
 
         def enum_label(prefix, value):
@@ -84,9 +98,10 @@ def create_app():
         next_url = request.args.get("next") or request.referrer or url_for("main.home")
         return redirect(next_url)
 
-    @app.route("/uploads/<path:filename>")
+    @app.route("/media/<path:filename>")
     def uploaded_media(filename):
-        return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+        normalized = str(filename).replace("\\", "/").lstrip("/")
+        return send_from_directory(app.config["STORAGE_ROOT"], normalized)
 
     @app.errorhandler(404)
     def not_found(error):
