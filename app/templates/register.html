@@ -10,9 +10,13 @@
             <div class="flash flash-danger">{{ form_error_message }}</div>
         {% endif %}
         <form method="post" action="{{ url_for('auth.register') }}" class="form-grid" enctype="multipart/form-data" id="registration-form"
+              data-submit-url="{{ url_for('auth.register') }}"
               data-camera-ready="{{ tr('demo_camera_ready') }}"
               data-camera-denied="{{ tr('message_camera_denied') }}"
-              data-camera-unavailable="{{ tr('message_camera_unavailable') }}">
+              data-camera-unavailable="{{ tr('message_camera_unavailable') }}"
+              data-camera-https-required="{{ tr('message_camera_https_required') }}"
+              data-validation-message="{{ tr('message_biometric_enrollment_required') }}"
+              data-processing-label="{{ tr('demo_processing') }}">
             <label>{{ tr('form_username') }}
                 <input type="text" name="username" value="{{ form_values.username if form_values else '' }}" required>
             </label>
@@ -52,7 +56,8 @@
                     <input type="file" name="biometric_image" id="register-biometric-image-input" accept=".png,.jpg,.jpeg,.bmp">
                 </label>
             </div>
-            <button class="btn btn-primary" type="submit">{{ tr('form_submit_register') }}</button>
+            <div class="flash flash-danger" id="register-form-error" hidden></div>
+            <button class="btn btn-primary" type="submit" id="register-submit-button">{{ tr('form_submit_register') }}</button>
         </form>
     </div>
 </section>

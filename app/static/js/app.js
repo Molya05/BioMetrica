@@ -72,6 +72,9 @@ function createCameraController(config) {
         deniedMessage,
         unavailableMessage,
         insecureContextMessage,
+        captureMaxDimension,
+        outputMimeType,
+        outputQuality,
     } = config;
 
     let stream = null;
@@ -172,16 +175,24 @@ function createCameraController(config) {
             return null;
         }
 
-        canvas.width = width;
-        canvas.height = height;
+        let targetWidth = width;
+        let targetHeight = height;
+        if (captureMaxDimension && Math.max(width, height) > captureMaxDimension) {
+            const scale = captureMaxDimension / Math.max(width, height);
+            targetWidth = Math.max(1, Math.round(width * scale));
+            targetHeight = Math.max(1, Math.round(height * scale));
+        }
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
         const context = canvas.getContext("2d");
         if (!context) {
             setStatus(unavailableMessage);
             return null;
         }
 
-        context.drawImage(video, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL("image/png");
+        context.drawImage(video, 0, 0, targetWidth, targetHeight);
+        const dataUrl = canvas.toDataURL(outputMimeType || "image/png", outputQuality);
         if (hiddenInput) {
             hiddenInput.value = dataUrl;
         }
@@ -319,7 +330,12 @@ function initRegistrationEnrollment() {
         return;
     }
 
-    createCameraController({
+    const submitButton = document.getElementById("register-submit-button");
+    const errorBox = document.getElementById("register-form-error");
+    const defaultButtonLabel = submitButton ? submitButton.textContent : "";
+    let isSubmitting = false;
+
+    const camera = createCameraController({
         input: document.getElementById("register-biometric-image-input"),
         preview: document.getElementById("register-image-preview"),
         hiddenInput: document.getElementById("register-webcam-image-data"),
@@ -334,6 +350,76 @@ function initRegistrationEnrollment() {
         deniedMessage: form.dataset.cameraDenied,
         unavailableMessage: form.dataset.cameraUnavailable,
         insecureContextMessage: form.dataset.cameraHttpsRequired || form.dataset.cameraUnavailable,
+        captureMaxDimension: 1280,
+        outputMimeType: "image/jpeg",
+        outputQuality: 0.86,
+    });
+
+    const showError = (message) => {
+        if (errorBox) {
+            errorBox.textContent = message || "";
+            errorBox.hidden = !message;
+        }
+    };
+
+    const resetSubmitState = () => {
+        isSubmitting = false;
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = defaultButtonLabel;
+        }
+    };
+
+    showError("");
+    resetSubmitState();
+    window.addEventListener("pageshow", resetSubmitState);
+
+    form.addEventListener("submit", async (event) => {
+        if (isSubmitting) {
+            event.preventDefault();
+            return;
+        }
+
+        event.preventDefault();
+        showError("");
+        camera.setStatus("");
+
+        if (!form.reportValidity()) {
+            console.warn("Registration form blocked by browser validation.");
+            return;
+        }
+
+        if (!camera.hasSource()) {
+            const message = form.dataset.validationMessage || "Please provide a biometric image before registering.";
+            console.warn("Registration blocked: biometric source missing.");
+            camera.setStatus(message);
+            showError(message);
+            return;
+        }
+
+        isSubmitting = true;
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = form.dataset.processingLabel || defaultButtonLabel;
+        }
+
+        try {
+            form.action = form.dataset.submitUrl || form.getAttribute("action") || window.location.pathname;
+            console.info("Submitting registration form", {
+                action: form.action,
+                method: (form.getAttribute("method") || "post").toUpperCase(),
+                source: document.getElementById("register-webcam-image-data")?.value ? "camera" : "file",
+            });
+            camera.stop();
+            await new Promise((resolve) => window.requestAnimationFrame(resolve));
+            HTMLFormElement.prototype.submit.call(form);
+        } catch (error) {
+            console.error("Registration submit failed before request was sent.", error);
+            const message = form.dataset.cameraUnavailable || "Registration could not be submitted.";
+            showError(message);
+            camera.setStatus(message);
+            resetSubmitState();
+        }
     });
 }
 

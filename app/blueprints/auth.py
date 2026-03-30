@@ -545,6 +545,15 @@ def register():
         if preferred_language not in current_app.config["LANGUAGES"]:
             preferred_language = current_app.config["DEFAULT_LANGUAGE"]
 
+        current_app.logger.info(
+            "register POST received remote=%s content_length=%s has_file=%s has_camera_data=%s user_agent=%s",
+            request.headers.get("X-Forwarded-For", request.remote_addr),
+            request.content_length,
+            bool(biometric_image and biometric_image.filename),
+            bool(webcam_image_data),
+            request.user_agent.string,
+        )
+
         form_data = {
             "username": username,
             "email": email,
@@ -570,14 +579,37 @@ def register():
             "registration_capture.png",
         )
         if input_error:
+            current_app.logger.warning(
+                "register biometric input rejected username=%s email=%s error=%s",
+                username,
+                email,
+                input_error,
+            )
             flash(input_error, "danger")
             return render_template("register.html", **_registration_context(form_data, input_error))
 
-        enrollment_result = analyze_image(captured_frame, current_app.config["PROCESSED_FOLDER"])
+        try:
+            enrollment_result = analyze_image(captured_frame, current_app.config["PROCESSED_FOLDER"])
+        except Exception:
+            current_app.logger.exception(
+                "register biometric processing crashed username=%s email=%s",
+                username,
+                email,
+            )
+            flash("message_registration_failed", "danger")
+            return render_template(
+                "register.html",
+                **_registration_context(
+                    form_data,
+                    error_message=translate(preferred_language, "message_registration_failed"),
+                ),
+            )
+
         current_app.logger.info(
-            "registration biometric username=%s success=%s timings=%s",
+            "register biometric processed username=%s success=%s error=%s timings=%s",
             username,
             enrollment_result.get("success"),
+            enrollment_result.get("error_code"),
             enrollment_result.get("timings", {}),
         )
         if not enrollment_result["success"]:
@@ -613,8 +645,28 @@ def register():
             db.session.add(profile)
             log_event("register", f"New user {username} registered.", user.id)
             db.session.commit()
+            current_app.logger.info(
+                "register success username=%s user_id=%s processed_path=%s",
+                username,
+                user.id,
+                enrollment_result.get("processed_path"),
+            )
         except SQLAlchemyError:
             db.session.rollback()
+            current_app.logger.exception(
+                "register database failure username=%s email=%s",
+                username,
+                email,
+            )
+            flash("message_registration_failed", "danger")
+            return render_template("register.html", **_registration_context(form_data, "message_registration_failed"))
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception(
+                "register unexpected failure username=%s email=%s",
+                username,
+                email,
+            )
             flash("message_registration_failed", "danger")
             return render_template("register.html", **_registration_context(form_data, "message_registration_failed"))
 
