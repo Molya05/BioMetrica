@@ -75,6 +75,7 @@ function createCameraController(config) {
         captureMaxDimension,
         outputMimeType,
         outputQuality,
+        autoCaptureOnClick = true,
     } = config;
 
     let stream = null;
@@ -228,7 +229,7 @@ function createCameraController(config) {
         openButton.addEventListener("click", open);
     }
 
-    if (captureButton) {
+    if (captureButton && autoCaptureOnClick) {
         captureButton.addEventListener("click", capture);
     }
 
@@ -460,6 +461,7 @@ function initBiometricLogin() {
         deniedMessage: biometricPanel.dataset.cameraDenied,
         unavailableMessage: biometricPanel.dataset.cameraUnavailable,
         insecureContextMessage: biometricPanel.dataset.cameraHttpsRequired,
+        autoCaptureOnClick: false,
     });
 
     const stageElements = stageGrid ? Array.from(stageGrid.querySelectorAll("[data-stage]")) : [];
@@ -718,8 +720,19 @@ function initBiometricLogin() {
 
         const capturedImage = camera.capture();
         if (!capturedImage) {
+            console.error("Biometric login capture failed before request send.", {
+                hasStreamImage: Boolean(hiddenImageInput?.value),
+            });
             setDiagnostic(diagnostics.frameCaptured, biometricPanel.dataset.diagFailed, "failed");
             setScannerState("error", biometricPanel.dataset.cameraUnavailable);
+            return;
+        }
+
+        if (!hiddenImageInput.value || hiddenImageInput.value.length < 64) {
+            console.error("Biometric login capture produced empty image payload.");
+            setDiagnostic(diagnostics.frameCaptured, biometricPanel.dataset.diagFailed, "failed");
+            setScannerState("error", biometricPanel.dataset.cameraUnavailable);
+            showResult(biometricPanel.dataset.cameraUnavailable, "", true);
             return;
         }
 
@@ -751,6 +764,11 @@ function initBiometricLogin() {
         redirectScheduled = false;
         const stopProcessingSequence = startProcessingSequence();
         try {
+            console.info("Submitting biometric login frame", {
+                endpoint: biometricPanel.dataset.endpoint,
+                identifier: identifierInput?.value.trim() || "",
+                payloadLength: hiddenImageInput.value.length,
+            });
             const response = await fetch(biometricPanel.dataset.endpoint, {
                 method: "POST",
                 body: payload,
