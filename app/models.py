@@ -47,9 +47,11 @@ class User(UserMixin, db.Model):
             return {}
 
     def latest_biometric_profile(self):
-        if not self.biometric_profiles:
-            return None
-        return self.biometric_profiles[0]
+        return (
+            BiometricProfile.query.filter_by(user_id=self.id)
+            .order_by(BiometricProfile.updated_at.desc())
+            .first()
+        )
 
 
 class BiometricProfile(db.Model):

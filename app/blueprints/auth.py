@@ -1,6 +1,10 @@
 import base64
 import binascii
 from datetime import datetime, timedelta
+import time
+
+import cv2
+import numpy as np
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
@@ -19,6 +23,8 @@ BIOMETRIC_LOGIN_THRESHOLD = 65.0
 
 REGISTER_VALIDATION_MESSAGE_MAP = {
     "image_load_error": ("validation_image_load_error", "validation_recapture"),
+    "invalid_frame": ("validation_image_load_error", "validation_recapture"),
+    "no_face_detected": ("validation_no_reliable_eye_detected", "validation_face_camera"),
     "both_eyes_not_visible": ("validation_both_eyes_not_visible", "validation_face_camera"),
     "eye_not_detected": ("validation_eye_not_detected", "validation_move_closer"),
     "eye_region_too_small": ("validation_eye_region_too_small", "validation_move_closer"),
@@ -27,6 +33,7 @@ REGISTER_VALIDATION_MESSAGE_MAP = {
     "image_too_blurry": ("validation_image_too_blurry", "validation_use_sharper"),
     "strong_glare": ("validation_strong_glare", "validation_reduce_reflection"),
     "poor_contrast": ("validation_poor_contrast", "validation_improve_lighting"),
+    "segmentation_failed": ("validation_eye_partially_blocked", "validation_open_eye"),
     "eye_partially_blocked": ("validation_eye_partially_blocked", "validation_open_eye"),
 }
 
@@ -79,28 +86,46 @@ def _login_context(form_data=None, feedback_key=None, feedback_message=None, fee
 
 
 def _save_biometric_input(upload_file, webcam_image_data, fallback_name):
+    def _decode_frame(image_bytes):
+        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+        if image_array.size == 0:
+            return None
+        frame = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+        if frame is None or frame.size == 0:
+            return None
+        return frame
+
     if webcam_image_data:
         try:
             _, encoded = webcam_image_data.split(",", 1)
             image_bytes = base64.b64decode(encoded)
         except (ValueError, binascii.Error):
-            return None, None, "message_biometric_upload_invalid"
+            return None, None, None, "message_biometric_upload_invalid"
+
+        frame = _decode_frame(image_bytes)
+        if frame is None:
+            return None, None, None, "message_biometric_upload_invalid"
 
         filename = unique_filename(fallback_name)
         saved_path = current_app.config["UPLOAD_FOLDER"] / filename
         saved_path.write_bytes(image_bytes)
-        return saved_path, fallback_name, None
+        return saved_path, fallback_name, frame, None
 
     if not upload_file or not upload_file.filename:
-        return None, None, "message_biometric_enrollment_required"
+        return None, None, None, "message_biometric_enrollment_required"
 
     if not allowed_file(upload_file.filename):
-        return None, None, "message_biometric_upload_invalid"
+        return None, None, None, "message_biometric_upload_invalid"
+
+    image_bytes = upload_file.read()
+    frame = _decode_frame(image_bytes)
+    if frame is None:
+        return None, None, None, "message_biometric_upload_invalid"
 
     filename = unique_filename(upload_file.filename)
     saved_path = current_app.config["UPLOAD_FOLDER"] / filename
-    upload_file.save(saved_path)
-    return saved_path, upload_file.filename, None
+    saved_path.write_bytes(image_bytes)
+    return saved_path, upload_file.filename, frame, None
 
 
 def _resolve_biometric_feedback(lang, error_code):
@@ -220,6 +245,8 @@ def _biometric_login_response(
         "matched_user": matched_user,
         "message": error_message if not success else translate(preferred_language, "message_biometric_login_success"),
         "processing_time": result.get("processing_time", 0.0),
+        "timings": result.get("timings", {}),
+        "debug_details": details,
         "stages": stages,
         "stage_images": {key: to_public_path(value) for key, value in result.get("stage_images", {}).items()},
         "annotated_path": to_public_path(result["processed_path"]) if result.get("processed_path") else None,
@@ -333,7 +360,7 @@ def biometric_login():
             extra={"current_step": "user_lookup_failed"},
         )
 
-    saved_path, _, input_error = _save_biometric_input(upload_file, webcam_image_data, "biometric_login_capture.png")
+    saved_path, _, captured_frame, input_error = _save_biometric_input(upload_file, webcam_image_data, "biometric_login_capture.png")
     if input_error:
         return _biometric_login_response(
             preferred_language=preferred_language,
@@ -359,7 +386,15 @@ def biometric_login():
             extra={"current_step": "capturing_image"},
         )
 
-    result = analyze_image(saved_path, current_app.config["PROCESSED_FOLDER"], require_both_eyes=True)
+    analysis_start = time.perf_counter()
+    result = analyze_image(captured_frame, current_app.config["PROCESSED_FOLDER"], require_both_eyes=True)
+    current_app.logger.info(
+        "biometric_login analysis identifier=%s success=%s timings=%s elapsed=%.4fs",
+        identifier,
+        result.get("success"),
+        result.get("timings", {}),
+        time.perf_counter() - analysis_start,
+    )
     if not result["success"]:
         error_message, recommendation_message = _resolve_biometric_feedback(preferred_language, result.get("error_code"))
         return _biometric_login_response(
@@ -402,7 +437,18 @@ def biometric_login():
         )
 
     enrolled_template = biometric_profile.biometric_template_dict()
+    comparison_start = time.perf_counter()
     match_result = compare_templates(result["biometric_template"], enrolled_template, threshold=BIOMETRIC_LOGIN_THRESHOLD)
+    comparison_time = round(time.perf_counter() - comparison_start, 4)
+    result.setdefault("timings", {})["database_comparison"] = comparison_time
+    result["timings"]["final_decision"] = comparison_time
+    current_app.logger.info(
+        "biometric_login compare identifier=%s decision=%s similarity=%s timings=%s",
+        identifier,
+        match_result.get("decision"),
+        match_result.get("similarity_score"),
+        result.get("timings", {}),
+    )
 
     if match_result["decision"] != "matched":
         return _biometric_login_response(
@@ -427,7 +473,7 @@ def biometric_login():
                 **result,
                 "stages": {
                     **result.get("stages", {}),
-                    "comparison": "failed",
+                    "comparison": "completed",
                     "final_result": "failed",
                 },
             },
@@ -458,7 +504,14 @@ def biometric_login():
         threshold=BIOMETRIC_LOGIN_THRESHOLD,
         similarity_score=match_result["similarity_score"],
         matched_user=user.username,
-        result=result,
+        result={
+            **result,
+            "stages": {
+                **result.get("stages", {}),
+                "comparison": "completed",
+                "final_result": "completed",
+            },
+        },
         saved_path=saved_path,
         extra={
             "matched_profile_id": biometric_profile.id,
@@ -511,7 +564,7 @@ def register():
             flash("message_user_exists", "danger")
             return render_template("register.html", **_registration_context(form_data, "message_user_exists"))
 
-        biometric_path, original_name, input_error = _save_biometric_input(
+        biometric_path, original_name, captured_frame, input_error = _save_biometric_input(
             biometric_image,
             webcam_image_data,
             "registration_capture.png",
@@ -520,7 +573,13 @@ def register():
             flash(input_error, "danger")
             return render_template("register.html", **_registration_context(form_data, input_error))
 
-        enrollment_result = analyze_image(biometric_path, current_app.config["PROCESSED_FOLDER"])
+        enrollment_result = analyze_image(captured_frame, current_app.config["PROCESSED_FOLDER"])
+        current_app.logger.info(
+            "registration biometric username=%s success=%s timings=%s",
+            username,
+            enrollment_result.get("success"),
+            enrollment_result.get("timings", {}),
+        )
         if not enrollment_result["success"]:
             localized_error, localized_recommendation = _resolve_biometric_feedback(
                 preferred_language,

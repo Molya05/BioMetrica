@@ -1,6 +1,10 @@
 import base64
 import binascii
 from datetime import datetime, timedelta
+import time
+
+import cv2
+import numpy as np
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -18,6 +22,8 @@ dashboard_bp = Blueprint("dashboard", __name__)
 
 VALIDATION_MESSAGE_MAP = {
     "image_load_error": ("validation_image_load_error", "validation_recapture"),
+    "invalid_frame": ("validation_image_load_error", "validation_recapture"),
+    "no_face_detected": ("validation_no_reliable_eye_detected", "validation_face_camera"),
     "eye_not_detected": ("validation_eye_not_detected", "validation_move_closer"),
     "eye_region_too_small": ("validation_eye_region_too_small", "validation_move_closer"),
     "face_detected_eyes_too_small": ("validation_face_detected_eyes_too_small", "validation_move_closer"),
@@ -25,9 +31,20 @@ VALIDATION_MESSAGE_MAP = {
     "image_too_blurry": ("validation_image_too_blurry", "validation_use_sharper"),
     "strong_glare": ("validation_strong_glare", "validation_reduce_reflection"),
     "poor_contrast": ("validation_poor_contrast", "validation_improve_lighting"),
+    "segmentation_failed": ("validation_eye_partially_blocked", "validation_open_eye"),
     "eye_partially_blocked": ("validation_eye_partially_blocked", "validation_open_eye"),
     "no_biometric_template": ("message_biometric_template_missing", "message_biometric_template_missing_hint"),
 }
+
+
+def _decode_request_frame(image_bytes):
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    if image_array.size == 0:
+        return None
+    frame = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    if frame is None or frame.size == 0:
+        return None
+    return frame
 
 
 @dashboard_bp.route("/recognition", methods=["GET", "POST"])
@@ -37,12 +54,18 @@ def recognition():
     if request.method == "POST":
         image = request.files.get("eye_image")
         webcam_image_data = (request.form.get("webcam_image_data") or "").strip()
+        captured_frame = None
 
         if webcam_image_data:
             try:
                 _, encoded = webcam_image_data.split(",", 1)
                 image_bytes = base64.b64decode(encoded)
             except (ValueError, binascii.Error):
+                flash("message_upload_invalid", "danger")
+                return render_template("recognition.html", analysis_result=analysis_result)
+
+            captured_frame = _decode_request_frame(image_bytes)
+            if captured_frame is None:
                 flash("message_upload_invalid", "danger")
                 return render_template("recognition.html", analysis_result=analysis_result)
 
@@ -58,12 +81,26 @@ def recognition():
                 flash("message_upload_invalid", "danger")
                 return render_template("recognition.html", analysis_result=analysis_result)
 
+            image_bytes = image.read()
+            captured_frame = _decode_request_frame(image_bytes)
+            if captured_frame is None:
+                flash("message_upload_invalid", "danger")
+                return render_template("recognition.html", analysis_result=analysis_result)
+
             filename = unique_filename(image.filename)
             saved_path = current_app.config["UPLOAD_FOLDER"] / filename
-            image.save(saved_path)
+            saved_path.write_bytes(image_bytes)
             original_filename = image.filename
 
-        result = analyze_image(saved_path, current_app.config["PROCESSED_FOLDER"])
+        analysis_start = time.perf_counter()
+        result = analyze_image(captured_frame, current_app.config["PROCESSED_FOLDER"])
+        current_app.logger.info(
+            "recognition analysis user_id=%s success=%s timings=%s elapsed=%.4fs",
+            current_user.id,
+            result.get("success"),
+            result.get("timings", {}),
+            time.perf_counter() - analysis_start,
+        )
         error_code = result.get("error_code")
         message_key, recommendation_key = VALIDATION_MESSAGE_MAP.get(
             error_code,
@@ -89,10 +126,19 @@ def recognition():
                 flash("message_biometric_template_missing", "danger")
                 return render_template("recognition.html", analysis_result=analysis_result)
 
+            comparison_start = time.perf_counter()
             verification_result = compare_templates(result["biometric_template"], enrolled_template)
+            comparison_time = round(time.perf_counter() - comparison_start, 4)
+            result.setdefault("timings", {})["database_comparison"] = comparison_time
+            result["timings"]["final_decision"] = comparison_time
             decision = verification_result["decision"]
             status = "authenticated" if decision == "matched" else "rejected"
             matched_user = current_user.username if decision == "matched" else None
+            result["stages"] = {
+                **result.get("stages", {}),
+                "comparison": "completed",
+                "final_result": "completed" if decision == "matched" else "failed",
+            }
             record = Analysis(
                 user_id=current_user.id,
                 filename=original_filename,
@@ -110,8 +156,16 @@ def recognition():
                         "matched_user": matched_user,
                         "stage_images": {key: to_public_path(value) for key, value in result.get("stage_images", {}).items()},
                         "component_scores": verification_result.get("component_scores", {}),
+                        "timings": result.get("timings", {}),
                     }
                 ),
+            )
+            current_app.logger.info(
+                "recognition compare user_id=%s decision=%s similarity=%s timings=%s",
+                current_user.id,
+                decision,
+                verification_result.get("similarity_score"),
+                result.get("timings", {}),
             )
             db.session.add(record)
             log_event(
@@ -130,6 +184,7 @@ def recognition():
                 "stage_images": {key: to_public_path(value) for key, value in result.get("stage_images", {}).items()},
                 "component_scores": verification_result.get("component_scores", {}),
                 "stages": result.get("stages", {}),
+                "timings": result.get("timings", {}),
                 "error_message": None,
                 "recommendation_message": None,
             }
@@ -152,6 +207,7 @@ def recognition():
                         "recommendation_message": localized_recommendation,
                         "details": result.get("details", {}),
                         "stage_images": {key: to_public_path(value) for key, value in result.get("stage_images", {}).items()},
+                        "timings": result.get("timings", {}),
                     }
                 ),
             )
@@ -164,6 +220,7 @@ def recognition():
                 "annotated_path": to_public_path(result["processed_path"]) if result.get("processed_path") else None,
                 "stage_images": {key: to_public_path(value) for key, value in result.get("stage_images", {}).items()},
                 "stages": result.get("stages", {}),
+                "timings": result.get("timings", {}),
                 "error_message": localized_error,
                 "recommendation_message": localized_recommendation,
             }
