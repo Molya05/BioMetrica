@@ -1,0 +1,22 @@
+{
+  "extends": [
+    "development"
+  ],
+  "hints": {
+    "compat-api/css": [
+      "default",
+      {
+        "ignore": [
+          "hyphens",
+          "backdrop-filter",
+          "text-wrap",
+          "text-wrap: pretty",
+          "-webkit-overflow-scrolling",
+          "scrollbar-width",
+          "scrollbar-width: none",
+          "text-wrap: balance"
+        ]
+      }
+    ]
+  }
+}

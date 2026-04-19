@@ -68,7 +68,7 @@ def _build_failure(
     }
 
 
-def compare_templates(candidate_template, enrolled_template, threshold=82):
+def compare_templates(candidate_template, enrolled_template, threshold=92):
     comparable_keys = [
         ("darkness_index", 160.0, 0.16),
         ("contrast_index", 70.0, 0.16),
